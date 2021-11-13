@@ -4445,40 +4445,44 @@ void ptlock_free(struct page *page)
 }
 #endif
 
-static unsigned long harry_xu __read_mostly = 420;
+static unsigned long page_fault_count __read_mostly = 0;
+static unsigned long page_fault_latency __read_mostly = 0;
+static char fastswap_output[130] = "";
 
 #ifdef CONFIG_DEBUG_FS
-static int harry_xu_get(void *data, u64 *val)
+static ssize_t fastswap_benchmarks_read(struct file *file, char __user *buf,
+		size_t len, loff_t *ppos)
 {
-	ktime_t start_time;
-	ktime_t end_time;
-
-	// Delay for `harry_xu` useconds, then return the time taken. 
-	start_time = ktime_get();
-	udelay(harry_xu); 
-	end_time = ktime_get();
-
-	*val = ktime_to_ns(ktime_sub(end_time, start_time));
-	return 0;
+	if (*ppos == 0)	
+		page_fault_count++;
+	snprintf(fastswap_output, sizeof(fastswap_output), 
+			"%u,%u\n", page_fault_count, page_fault_latency);
+	return simple_read_from_buffer(buf, len, ppos, 
+			fastswap_output, strlen(fastswap_output));
 }
 
-static int harry_xu_set(void *data, u64 val)
+static ssize_t fastswap_benchmarks_write(struct file *file, 
+		const char __user *buf, size_t len, loff_t *ppos)
 {
-	harry_xu = val; 
-	return 0;
+	return -1;
 }
-DEFINE_SIMPLE_ATTRIBUTE(harry_xu_fops,
-		harry_xu_get, harry_xu_set, "%llu\n");
 
-static int __init harry_xu_debugfs(void)
+static struct file_operations fastswap_benchmarks_fops = 
+{
+	.read = fastswap_benchmarks_read,
+	.write = fastswap_benchmarks_write,
+};
+
+static int __init fastswap_benchmarks_debugfs(void)
 {
 	void *ret;
 
-	ret = debugfs_create_file("harry_xu", 0644, NULL, NULL,
-			&harry_xu_fops);
+	ret = debugfs_create_file("fastswap_benchmarks", 0444, NULL, NULL,
+			&fastswap_benchmarks_fops);
+	
 	if (!ret)
-		pr_warn("Failed to create harry_xu in debugfs");
+		pr_warn("Failed to create fastswap_benchmarks in debugfs");
 	return 0;
 }
-late_initcall(harry_xu_debugfs);
+late_initcall(fastswap_benchmarks_debugfs);
 #endif
