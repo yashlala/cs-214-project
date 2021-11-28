@@ -4,6 +4,9 @@ import subprocess
 import time
 import psutil
 import datetime
+import pandas as pd
+import csv
+import matplotlib.pyplot as plt
 
 from cgroups import Cgroup
 
@@ -16,11 +19,6 @@ log = open('log.txt', 'a')
 def run_process(name, limit):
         cg = Cgroup('testing'+str(limit))
         cg.set_memory_limit(limit)
-        # p = subprocess.Popen(['python3', name])
-        # p = subprocess.Popen(['nohup', 'python3', name, '&&'],
-        #          stdout=log,
-        #          stderr=log,
-        #          preexec_fn=os.setpgrp )
         p = subprocess.Popen(['python3', name],
                  stdout=log,
                  stderr=log,
@@ -28,7 +26,8 @@ def run_process(name, limit):
         PID = p.pid
         cg.add(int(PID))
         print('started ' + name + ' with pid '+ str(PID) + ' and memory '+ str(limit) )
-        check_page_faults(name, PID, limit)
+        log_time =0 
+        check_page_faults(name, PID, limit, log_time)
 
 
 def check_pid(pid):        
@@ -38,19 +37,21 @@ def check_pid(pid):
     else:
         return True
 
-def check_page_faults(name, pid, limit):
+def check_page_faults(name, pid, limit, log_time):
     while (check_pid(pid)):
-        print("a process with pid %d exists" % pid)
+        incr_time = 1
+        # print("a process with pid %d exists" % pid)
         stream = os.popen('cut -d " " -f 10,12 /proc/'+str(pid)+'/stat')
         key = name+":"+str(limit)+":"+str(pid)
-        output = str(datetime.datetime.now().time())+name+":"+str(limit)+":"+str(pid) +" "+stream.read()
-        print(output)
+        output = name+","+str(limit)+","+str(pid)+","+str(log_time)+","+stream.read().replace(" ",",")
+        # print(output)
         write_to_file(key, output)
-        time.sleep(30)
+        log_time = log_time + incr_time 
+        time.sleep(incr_time)
 
 
 def write_to_file(key, output):
-    f= open('output.txt', 'a+')    
+    f= open('output.csv', 'a+')    
     # lines = f.readLines()
     # for line in f:
     #     print(key)
@@ -61,10 +62,28 @@ def write_to_file(key, output):
     f.writelines(output)
 
 
+def generate_graph(file_name, process):
+    df = pd.read_csv(file_name,header=None) 
+    # print (df)    
+    fig, ax = plt.subplots()
+    for memory, group in df.groupby(df.columns[1]):
+        group.plot(x=df.columns[3], y=df.columns[4], ax=ax, label=memory)
+    
+    plt.title('Graph for ' + process)
+    plt.xlabel("Time interval in seconds")
+    plt.ylabel("Number of Minor page faults")
+    
+    plt.show()
+
+
 def main():
     process = sys.argv[1]
+    file_name = 'output.csv'
+    if os.path.exists(file_name): os.remove(file_name)
     for memory in memory_limits:
         run_process(process, memory)
+
+    generate_graph(file_name, process)
 
 if __name__ == "__main__":
     main()
