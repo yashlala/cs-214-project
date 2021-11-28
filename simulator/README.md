@@ -5,8 +5,7 @@ More details to follow.
 
 To run the simulation:
 
-download cgroups using:
-pip install cgroups
+download requirements from the requirements.txt:
 
 then, as a root user, execute:
-python3 simulation.py {$PID}
+python3 simulation.py hello.py
