@@ -2685,15 +2685,20 @@ int do_swap_page(struct vm_fault *vmf)
 	int exclusive = 0;
 	int ret = 0;
 
+	// If there were atomicity errors, die. 
 	if (!pte_unmap_same(vma->vm_mm, vmf->pmd, vmf->pte, vmf->orig_pte))
 		goto out;
 
+	// Locate the file to swap from. 
 	entry = pte_to_swp_entry(vmf->orig_pte);
 	if (unlikely(non_swap_entry(entry))) {
 		if (is_migration_entry(entry)) {
 			migration_entry_wait(vma->vm_mm, vmf->pmd,
 					     vmf->address);
 		} else if (is_hwpoison_entry(entry)) {
+			// Describes an an intel x86 feature; automatically
+			// kill processes associated with the page table if
+			// it's corrupted. 
 			ret = VM_FAULT_HWPOISON;
 		} else {
 			print_bad_pte(vma, vmf->address, vmf->orig_pte, NULL);
@@ -2702,11 +2707,20 @@ int do_swap_page(struct vm_fault *vmf)
 		goto out;
 	}
 
+	// Let the delay accounting system (measures time kernel spends doing
+	// things) know that we're swapping rn. TODO: We can use this to figure
+	// out how much time we spend on our page faults!
 	delayacct_set_flag(DELAYACCT_PF_SWAPIN);
+
+	// Look for the entry in our swap cache. 
 	page = lookup_swap_cache(entry);
 	if (!page) {
+		// Not in swap cache. Read it in. 
+		// TODO: Objective 3 is somewhere in there. The swap cache hit
+		// numbers are in there. 
 		page = swapin_readahead(entry, GFP_HIGHUSER_MOVABLE, vma,
 					vmf->address);
+		// Seems to deal with a race condition. Not useful here. 
 		if (!page) {
 			/*
 			 * Back out if somebody else faulted in this pte
@@ -2720,11 +2734,19 @@ int do_swap_page(struct vm_fault *vmf)
 			goto unlock;
 		}
 
+		// TODO: It says we had to read from swap. How do we *know*? 
+		// Is this where data is being transferred, or just setting up
+		// flags? 
+		// Maybe the `memory.c` is just ASKING the swapcache to load
+		// into itself? The swapcache acts as an interface between our
+		// module and the disk? 
+
 		/* Had to read the page from swap area: Major fault */
 		ret = VM_FAULT_MAJOR;
-		count_vm_event(PGMAJFAULT);
+		count_vm_event(PGMAJFAULT); // Annotations
 		mem_cgroup_count_vm_event(vma->vm_mm, PGMAJFAULT);
-	} else if (PageHWPoison(page)) {
+
+	} else if (PageHWPoison(page)) { // Just some error checking
 		/*
 		 * hwpoisoned dirty swapcache pages are kept for killing
 		 * owner processes (which may be unknown at hwpoison time)
@@ -2735,6 +2757,8 @@ int do_swap_page(struct vm_fault *vmf)
 		goto out_release;
 	}
 
+	// TODO: What's with the swapcache = page? We're somehow doing the
+	// error handling later? 
 	swapcache = page;
 	locked = lock_page_or_retry(page, vma->vm_mm, vmf->flags);
 
@@ -2753,10 +2777,29 @@ int do_swap_page(struct vm_fault *vmf)
 	if (unlikely(!PageSwapCache(page) || page_private(page) != entry.val))
 		goto out_page;
 
+	// KSM: An automatic deduplication method for shared memory. 
+	// There are TWO levels of deduplication here. 
+	// 1. Say there's shared memory. Multiple procs will point to the same
+	//       entry in the swap cache. This is "sharing" memory. 
+	// 2. Say there are 2 pages, different in bookkeeping, but have the same
+	//       CONTENTS. (eg 2 writable things that happen to stay the same).
+	//       This is entirely independent of where the memory comes from. 
+	//       It's called KSM. 
+	//       Say that our page was actually shared with another one via KSM.
+	//       Ordinarily, writing to this page would un-duplicate it, and we'd
+	//       become the owners of a new copy. Here, we CAN'T do that -- because
+	//       the page could very well be used by another process (it's shared,
+	//       might be in swap cache). So we can't become the true owners --
+	//       instead, we ask KSM to give us a new copy that's free from any ksm
+	//       shenanigans. 
+	//       Other processes with the same page might do the same thing. We
+	//       just have to hope that a later KSM sweep will combine the pages in
+	//       that case. 
+	// TLDR: The below line frees us from KSM. 
 	page = ksm_might_need_to_copy(page, vma, vmf->address);
 	if (unlikely(!page)) {
 		ret = VM_FAULT_OOM;
-		page = swapcache;
+		page = swapcache; // TODO: why? 
 		goto out_page;
 	}
 
@@ -2769,6 +2812,7 @@ int do_swap_page(struct vm_fault *vmf)
 	/*
 	 * Back out if somebody else already faulted in this pte.
 	 */
+	// Some unknown race condition stuff. 
 	vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd, vmf->address,
 			&vmf->ptl);
 	if (unlikely(!pte_same(*vmf->pte, vmf->orig_pte)))
@@ -2789,6 +2833,7 @@ int do_swap_page(struct vm_fault *vmf)
 	 * must be called after the swap_free(), or it will never succeed.
 	 */
 
+	// Add the page to the PTE. The `page` is still new, via KSM. 
 	inc_mm_counter_fast(vma->vm_mm, MM_ANONPAGES);
 	dec_mm_counter_fast(vma->vm_mm, MM_SWAPENTS);
 	pte = mk_pte(page, vma->vm_page_prot);
@@ -2798,12 +2843,13 @@ int do_swap_page(struct vm_fault *vmf)
 		ret |= VM_FAULT_WRITE;
 		exclusive = RMAP_EXCLUSIVE;
 	}
-	flush_icache_page(vma, page);
+	flush_icache_page(vma, page); // Flushes instruction cache
 	if (pte_swp_soft_dirty(vmf->orig_pte))
 		pte = pte_mksoft_dirty(pte);
 	set_pte_at(vma->vm_mm, vmf->address, vmf->pte, pte);
 	vmf->orig_pte = pte;
-	if (page == swapcache) {
+	// If KSM didn't duplicate the page, we can become the exclusive owners
+	if (page == swapcache) { 
 		do_page_add_anon_rmap(page, vma, vmf->address, exclusive);
 		mem_cgroup_commit_charge(page, memcg, true, false);
 		activate_page(page);
