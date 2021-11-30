@@ -4528,8 +4528,6 @@ static int __init major_page_fault_latency_debugfs(void)
 }
 late_initcall(major_page_fault_latency_debugfs);
 
-
-#ifdef CONFIG_DEBUG_FS
 static int minor_page_fault_latency_get(void *data, u64 *val)
 {
 	atomic_t latency; 
