@@ -4491,40 +4491,76 @@ void ptlock_free(struct page *page)
 }
 #endif
 
-static unsigned long harry_xu __read_mostly = 420;
+static atomic_long_t major_page_fault_latency = ATOMIC_INIT(0); 
+static atomic_long_t minor_page_fault_latency = ATOMIC_INIT(0); 
 
 #ifdef CONFIG_DEBUG_FS
-static int harry_xu_get(void *data, u64 *val)
+static int major_page_fault_latency_get(void *data, u64 *val)
 {
-	ktime_t start_time;
-	ktime_t end_time;
+	atomic_t latency; 
 
-	// Delay for `harry_xu` useconds, then return the time taken. 
-	start_time = ktime_get();
-	udelay(harry_xu); 
-	end_time = ktime_get();
+	// TODO: Apply Sabrina's patch so we can export a monotonically increasing
+	// struct instead. 
 
-	*val = ktime_to_ns(ktime_sub(end_time, start_time));
+	latency = atomic_read(&major_page_fault_latency); 
+
+	*val = (u64) latency; // TODO: Are casts safe? 
 	return 0;
 }
 
-static int harry_xu_set(void *data, u64 val)
+static int major_page_fault_latency_set(void *data, u64 val)
 {
-	harry_xu = val; 
 	return 0;
 }
-DEFINE_SIMPLE_ATTRIBUTE(harry_xu_fops,
-		harry_xu_get, harry_xu_set, "%llu\n");
 
-static int __init harry_xu_debugfs(void)
+DEFINE_SIMPLE_ATTRIBUTE(major_page_fault_latency_fops,
+		major_page_fault_latency_get, major_page_fault_latency_set, "%llu\n");
+
+static int __init major_page_fault_latency_debugfs(void)
 {
 	void *ret;
 
-	ret = debugfs_create_file("harry_xu", 0644, NULL, NULL,
-			&harry_xu_fops);
+	ret = debugfs_create_file("major_page_fault_latency", 0644, NULL, NULL,
+			&major_page_fault_latency_fops);
 	if (!ret)
-		pr_warn("Failed to create harry_xu in debugfs");
+		pr_warn("Failed to create major_page_fault_latency in debugfs");
 	return 0;
 }
-late_initcall(harry_xu_debugfs);
+late_initcall(major_page_fault_latency_debugfs);
+
+
+#ifdef CONFIG_DEBUG_FS
+static int minor_page_fault_latency_get(void *data, u64 *val)
+{
+	atomic_t latency; 
+
+	// TODO: Apply Sabrina's patch so we can export a monotonically increasing
+	// struct instead. 
+
+	latency = atomic_read(&minor_page_fault_latency); 
+
+	*val = (u64) latency; // TODO: Are casts safe? 
+	return 0;
+}
+
+static int minor_page_fault_latency_set(void *data, u64 val)
+{
+	return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(minor_page_fault_latency_fops,
+		minor_page_fault_latency_get, minor_page_fault_latency_set, "%llu\n");
+
+static int __init minor_page_fault_latency_debugfs(void)
+{
+	void *ret;
+
+	ret = debugfs_create_file("minor_page_fault_latency", 0644, NULL, NULL,
+			&minor_page_fault_latency_fops);
+	if (!ret)
+		pr_warn("Failed to create minor_page_fault_latency in debugfs");
+	return 0;
+}
+late_initcall(minor_page_fault_latency_debugfs);
+
 #endif
