@@ -4521,7 +4521,7 @@ void ptlock_free(struct page *page)
 static int pagefault_latency_get(atomic_t *latency, void *data, u64 *val) { 
 	// TODO: Apply Sabrina's patch so we can export a monotonically increasing
 	// struct instead. 
-	*val = atomic_read(&major_pagefault_latency); 
+	*val = atomic_read(latency); 
 	return 0;
 
 }
