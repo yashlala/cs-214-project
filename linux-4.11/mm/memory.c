@@ -2922,7 +2922,7 @@ out_release:
 	if (ret & VM_FAULT_MAJOR) { 
 		atomic_set(&major_pagefault_latency, (int) ktime_to_ns(delta_time)); 
 	} else { 
-		atomic_set(&major_pagefault_latency, (int) ktime_to_ns(delta_time)); 
+		atomic_set(&minor_pagefault_latency, (int) ktime_to_ns(delta_time)); 
 	}
 
 	return ret;
