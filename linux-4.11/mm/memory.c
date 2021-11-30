@@ -4526,11 +4526,14 @@ static int minor_pagefault_latency_get(void *data, u64 *val)
 }
 static int major_pagefault_latency_set(void *data, u64 val)
 {
-	return 0;
+	atomic_set(&major_pagefault_latency, (int) val); 
+ 	return 0;
+ }
 }
 static int minor_pagefault_latency_set(void *data, u64 val)
 {
-	return 0;
+	atomic_set(&minor_pagefault_latency, (int) val); 
+ 	return 0;
 }
 
 DEFINE_SIMPLE_ATTRIBUTE(major_pagefault_latency_fops,
