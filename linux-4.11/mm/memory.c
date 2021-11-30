@@ -4491,65 +4491,67 @@ void ptlock_free(struct page *page)
 }
 #endif
 
-static atomic_t major_page_fault_latency = ATOMIC_INIT(0); 
-static atomic_t minor_page_fault_latency = ATOMIC_INIT(0); 
+static atomic_t major_pagefault_latency = ATOMIC_INIT(0); 
+static atomic_t minor_pagefault_latency = ATOMIC_INIT(0); 
 
 #ifdef CONFIG_DEBUG_FS
-static int major_page_fault_latency_get(void *data, u64 *val)
+
+static int major_pagefault_latency_get(void *data, u64 *val)
 {
-	// TODO: Apply Sabrina's patch so we can export a monotonically increasing
-	// struct instead. 
-	*val = atomic_read(&major_page_fault_latency); 
-	return 0;
+	return pagefault_latency_get(&major_pagefault_latency, data, val); 
+}
+static int minor_pagefault_latency_get(void *data, u64 *val)
+{
+	return pagefault_latency_get(&minor_pagefault_latency, data, val); 
 }
 
-static int major_page_fault_latency_set(void *data, u64 val)
+static int major_pagefault_latency_set(void *data, u64 val)
 {
 	return 0;
 }
-
-DEFINE_SIMPLE_ATTRIBUTE(major_page_fault_latency_fops,
-		major_page_fault_latency_get, major_page_fault_latency_set, "%llu\n");
-
-static int __init major_page_fault_latency_debugfs(void)
-{
-	void *ret;
-
-	ret = debugfs_create_file("major_page_fault_latency", 0644, NULL, NULL,
-			&major_page_fault_latency_fops);
-	if (!ret)
-		pr_warn("Failed to create major_page_fault_latency in debugfs");
-	return 0;
-}
-late_initcall(major_page_fault_latency_debugfs);
-
-static int minor_page_fault_latency_get(void *data, u64 *val)
-{
-	// TODO: Apply Sabrina's patch so we can export a monotonically increasing
-	// struct instead. 
-
-	*val = atomic_read(&minor_page_fault_latency); 
-	return 0;
-}
-
-static int minor_page_fault_latency_set(void *data, u64 val)
+static int minor_pagefault_latency_set(void *data, u64 val)
 {
 	return 0;
 }
 
-DEFINE_SIMPLE_ATTRIBUTE(minor_page_fault_latency_fops,
-		minor_page_fault_latency_get, minor_page_fault_latency_set, "%llu\n");
+DEFINE_SIMPLE_ATTRIBUTE(major_pagefault_latency_fops,
+		major_pagefault_latency_get, major_pagefault_latency_set, "%llu\n");
+DEFINE_SIMPLE_ATTRIBUTE(minor_pagefault_latency_fops,
+		minor_pagefault_latency_get, minor_pagefault_latency_set, "%llu\n");
 
-static int __init minor_page_fault_latency_debugfs(void)
+static int __init major_pagefault_latency_debugfs(void)
 {
 	void *ret;
 
-	ret = debugfs_create_file("minor_page_fault_latency", 0644, NULL, NULL,
-			&minor_page_fault_latency_fops);
+	ret = debugfs_create_file("major_pagefault_latency", 0644, NULL, NULL,
+			&major_pagefault_latency_fops);
 	if (!ret)
-		pr_warn("Failed to create minor_page_fault_latency in debugfs");
+		pr_warn("Failed to create major_pagefault_latency in debugfs");
 	return 0;
 }
-late_initcall(minor_page_fault_latency_debugfs);
+late_initcall(major_pagefault_latency_debugfs);
+
+static int __init minor_pagefault_latency_debugfs(void)
+{
+	void *ret;
+
+	ret = debugfs_create_file("minor_pagefault_latency", 0644, NULL, NULL,
+			&minor_pagefault_latency_fops);
+	if (!ret)
+		pr_warn("Failed to create minor_pagefault_latency in debugfs");
+	return 0;
+}
+late_initcall(minor_pagefault_latency_debugfs);
+
+/*
+ * Worker for latency scraping operations
+ */
+static int pagefault_latency_get(atomic_t *latency, void *data, u64 *val) { 
+	// TODO: Apply Sabrina's patch so we can export a monotonically increasing
+	// struct instead. 
+	*val = atomic_read(&major_pagefault_latency); 
+	return 0;
+
+}
 
 #endif
