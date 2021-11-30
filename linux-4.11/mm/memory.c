@@ -2667,7 +2667,7 @@ void unmap_mapping_range(struct address_space *mapping,
 EXPORT_SYMBOL(unmap_mapping_range);
 
 
-static atomic_t major_pagefault_latency = ATOMIC_INIT(0); 
+static atomic64_t major_pagefault_latency = ATOMIC64_INIT(0); 
 static atomic_t minor_pagefault_latency = ATOMIC_INIT(0); 
 /*
  * We enter with non-exclusive mmap_sem (to exclude vma changes,
@@ -2911,7 +2911,7 @@ out_time:
 	end_time = ktime_get(); 
 	delta_time = ktime_sub(end_time, start_time); 
 	if (ret & VM_FAULT_MAJOR) { 
-		atomic_set(&major_pagefault_latency, (int) ktime_to_ns(delta_time)); 
+		atomic64_set(&major_pagefault_latency, (int) ktime_to_ns(delta_time)); 
 	} else { 
 		atomic_set(&minor_pagefault_latency, (int) ktime_to_ns(delta_time)); 
 	}
@@ -4508,60 +4508,41 @@ void ptlock_free(struct page *page)
 
 
 #ifdef CONFIG_DEBUG_FS
-
-static int pagefault_latency_get(atomic_t *latency, void *data, u64 *val) { 
-	// TODO: Apply Sabrina's patch so we can export a monotonically increasing
-	// struct instead. 
-	*val = atomic_read(latency); 
-	return 0;
-
-}
-static int major_pagefault_latency_get(void *data, u64 *val)
+static unsigned long page_fault_count = 0;
+static char fastswap_output[130] = "";
+static ssize_t pagefault_latency_read(struct file *file, char __user *buf,
+		size_t len, loff_t *ppos)
 {
-	return pagefault_latency_get(&major_pagefault_latency, data, val); 
-}
-static int minor_pagefault_latency_get(void *data, u64 *val)
-{
-	return pagefault_latency_get(&minor_pagefault_latency, data, val); 
-}
-static int major_pagefault_latency_set(void *data, u64 val)
-{
-	atomic_set(&major_pagefault_latency, (int) val); 
- 	return 0;
-}
-static int minor_pagefault_latency_set(void *data, u64 val)
-{
-	atomic_set(&minor_pagefault_latency, (int) val); 
- 	return 0;
+	if (*ppos == 0)
+		page_fault_count++;
+	snprintf(fastswap_output, sizeof(fastswap_output), 
+			"%llu,%llu\n", page_fault_count,
+			atomic64_read(&major_pagefault_latency));
+	return simple_read_from_buffer(buf, len, ppos,
+			fastswap_output, strlen(fastswap_output));
 }
 
-DEFINE_SIMPLE_ATTRIBUTE(major_pagefault_latency_fops,
-		major_pagefault_latency_get, major_pagefault_latency_set, "%llu\n");
-DEFINE_SIMPLE_ATTRIBUTE(minor_pagefault_latency_fops,
-		minor_pagefault_latency_get, minor_pagefault_latency_set, "%llu\n");
+static ssize_t pagefault_latency_write(struct file *file,
+		const char __user *buf, size_t len, loff_t *ppos)
+{
+	return -1;
+}
 
-static int __init major_pagefault_latency_debugfs(void)
+static struct file_operations pagefault_latency_fops = 
+{
+	.read = pagefault_latency_read,
+	.write = pagefault_latency_write,
+};
+
+static int __init pagefault_latency_debugfs(void)
 {
 	void *ret;
-
-	ret = debugfs_create_file("major_pagefault_latency", 0644, NULL, NULL,
-			&major_pagefault_latency_fops);
+	ret = debugfs_create_file("pagefault_latency", 0444, NULL, NULL,
+		&pagefault_latency_fops);
 	if (!ret)
-		pr_warn("Failed to create major_pagefault_latency in debugfs");
+		pr_warn("Failed to create pagefault_latency in debugfs");
 	return 0;
 }
-late_initcall(major_pagefault_latency_debugfs);
-
-static int __init minor_pagefault_latency_debugfs(void)
-{
-	void *ret;
-
-	ret = debugfs_create_file("minor_pagefault_latency", 0644, NULL, NULL,
-			&minor_pagefault_latency_fops);
-	if (!ret)
-		pr_warn("Failed to create minor_pagefault_latency in debugfs");
-	return 0;
-}
-late_initcall(minor_pagefault_latency_debugfs);
+late_initcall(pagefault_latency_debugfs);
 
 #endif
