@@ -4491,20 +4491,15 @@ void ptlock_free(struct page *page)
 }
 #endif
 
-static atomic_long_t major_page_fault_latency = ATOMIC_INIT(0); 
-static atomic_long_t minor_page_fault_latency = ATOMIC_INIT(0); 
+static atomic_t major_page_fault_latency = ATOMIC_INIT(0); 
+static atomic_t minor_page_fault_latency = ATOMIC_INIT(0); 
 
 #ifdef CONFIG_DEBUG_FS
 static int major_page_fault_latency_get(void *data, u64 *val)
 {
-	atomic_t latency; 
-
 	// TODO: Apply Sabrina's patch so we can export a monotonically increasing
 	// struct instead. 
-
-	latency = atomic_read(&major_page_fault_latency); 
-
-	*val = (u64) latency; // TODO: Are casts safe? 
+	*val = atomic_read(&major_page_fault_latency); 
 	return 0;
 }
 
@@ -4530,14 +4525,10 @@ late_initcall(major_page_fault_latency_debugfs);
 
 static int minor_page_fault_latency_get(void *data, u64 *val)
 {
-	atomic_t latency; 
-
 	// TODO: Apply Sabrina's patch so we can export a monotonically increasing
 	// struct instead. 
 
-	latency = atomic_read(&minor_page_fault_latency); 
-
-	*val = (u64) latency; // TODO: Are casts safe? 
+	*val = atomic_read(&minor_page_fault_latency); 
 	return 0;
 }
 
