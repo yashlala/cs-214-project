@@ -2693,7 +2693,7 @@ int do_swap_page(struct vm_fault *vmf)
 
 	// If there were atomicity errors, die. 
 	if (!pte_unmap_same(vma->vm_mm, vmf->pmd, vmf->pte, vmf->orig_pte))
-		goto out;
+		goto out_time;
 
 	// Locate the file to swap from. 
 	entry = pte_to_swp_entry(vmf->orig_pte);
@@ -2710,7 +2710,7 @@ int do_swap_page(struct vm_fault *vmf)
 			print_bad_pte(vma, vmf->address, vmf->orig_pte, NULL);
 			ret = VM_FAULT_SIGBUS;
 		}
-		goto out;
+		goto out_time;
 	}
 
 	// Let the delay accounting system (measures time kernel spends doing
@@ -2887,7 +2887,7 @@ int do_swap_page(struct vm_fault *vmf)
 		ret |= do_wp_page(vmf);
 		if (ret & VM_FAULT_ERROR)
 			ret &= VM_FAULT_ERROR;
-		goto out;
+		goto out_time;
 	}
 
 	/* No need to invalidate - it was non-present before */
@@ -2895,7 +2895,7 @@ int do_swap_page(struct vm_fault *vmf)
 unlock:
 	pte_unmap_unlock(vmf->pte, vmf->ptl);
 
-	return ret;
+	goto out_time; 
 out_nomap:
 	mem_cgroup_cancel_charge(page, memcg, false);
 	pte_unmap_unlock(vmf->pte, vmf->ptl);
@@ -2907,7 +2907,7 @@ out_release:
 		unlock_page(swapcache);
 		put_page(swapcache);
 	}
-out: 
+out_time: 
 	end_time = ktime_get(); 
 	delta_time = ktime_sub(end_time, start_time); 
 	if (ret & VM_FAULT_MAJOR) { 
@@ -2916,6 +2916,7 @@ out:
 		atomic_set(&minor_pagefault_latency, (int) ktime_to_ns(delta_time)); 
 	}
 
+out: 
 	return ret;
 }
 
