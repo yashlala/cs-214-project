@@ -2916,7 +2916,6 @@ out_time:
 		atomic_set(&minor_pagefault_latency, (int) ktime_to_ns(delta_time)); 
 	}
 
-out: 
 	return ret;
 }
 
@@ -4529,7 +4528,6 @@ static int major_pagefault_latency_set(void *data, u64 val)
 {
 	atomic_set(&major_pagefault_latency, (int) val); 
  	return 0;
- }
 }
 static int minor_pagefault_latency_set(void *data, u64 val)
 {
