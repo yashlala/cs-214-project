@@ -2684,6 +2684,9 @@ int do_swap_page(struct vm_fault *vmf)
 	int locked;
 	int exclusive = 0;
 	int ret = 0;
+	ktime_t start_time, end_time, delta_time; 
+
+	start_time = ktime_get(); 
 
 	// If there were atomicity errors, die. 
 	if (!pte_unmap_same(vma->vm_mm, vmf->pmd, vmf->pte, vmf->orig_pte))
@@ -2889,6 +2892,15 @@ int do_swap_page(struct vm_fault *vmf)
 unlock:
 	pte_unmap_unlock(vmf->pte, vmf->ptl);
 out:
+
+	end_time = ktime_get(); 
+	delta_time = ktime_sub(end_time, start_time); 
+	if (ret & VM_FAULT_MAJOR) { 
+		atomic_set(&major_pagefault_latency, (int) ktime_to_ns(delta_time)); 
+	} else { 
+		atomic_set(&major_pagefault_latency, (int) ktime_to_ns(delta_time)); 
+	}
+
 	return ret;
 out_nomap:
 	mem_cgroup_cancel_charge(page, memcg, false);
@@ -2901,6 +2913,15 @@ out_release:
 		unlock_page(swapcache);
 		put_page(swapcache);
 	}
+
+	end_time = ktime_get(); 
+	delta_time = ktime_sub(end_time, start_time); 
+	if (ret & VM_FAULT_MAJOR) { 
+		atomic_set(&major_pagefault_latency, (int) ktime_to_ns(delta_time)); 
+	} else { 
+		atomic_set(&major_pagefault_latency, (int) ktime_to_ns(delta_time)); 
+	}
+
 	return ret;
 }
 
