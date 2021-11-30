@@ -2666,6 +2666,9 @@ void unmap_mapping_range(struct address_space *mapping,
 }
 EXPORT_SYMBOL(unmap_mapping_range);
 
+
+static atomic_t major_pagefault_latency = ATOMIC_INIT(0); 
+static atomic_t minor_pagefault_latency = ATOMIC_INIT(0); 
 /*
  * We enter with non-exclusive mmap_sem (to exclude vma changes,
  * but allow concurrent faults), and pte mapped but not yet locked.
@@ -4512,11 +4515,16 @@ void ptlock_free(struct page *page)
 }
 #endif
 
-static atomic_t major_pagefault_latency = ATOMIC_INIT(0); 
-static atomic_t minor_pagefault_latency = ATOMIC_INIT(0); 
 
 #ifdef CONFIG_DEBUG_FS
 
+static int pagefault_latency_get(atomic_t *latency, void *data, u64 *val) { 
+	// TODO: Apply Sabrina's patch so we can export a monotonically increasing
+	// struct instead. 
+	*val = atomic_read(&major_pagefault_latency); 
+	return 0;
+
+}
 static int major_pagefault_latency_get(void *data, u64 *val)
 {
 	return pagefault_latency_get(&major_pagefault_latency, data, val); 
@@ -4525,7 +4533,6 @@ static int minor_pagefault_latency_get(void *data, u64 *val)
 {
 	return pagefault_latency_get(&minor_pagefault_latency, data, val); 
 }
-
 static int major_pagefault_latency_set(void *data, u64 val)
 {
 	return 0;
@@ -4563,16 +4570,5 @@ static int __init minor_pagefault_latency_debugfs(void)
 	return 0;
 }
 late_initcall(minor_pagefault_latency_debugfs);
-
-/*
- * Worker for latency scraping operations
- */
-static int pagefault_latency_get(atomic_t *latency, void *data, u64 *val) { 
-	// TODO: Apply Sabrina's patch so we can export a monotonically increasing
-	// struct instead. 
-	*val = atomic_read(&major_pagefault_latency); 
-	return 0;
-
-}
 
 #endif
