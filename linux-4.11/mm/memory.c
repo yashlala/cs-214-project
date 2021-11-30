@@ -2894,15 +2894,6 @@ int do_swap_page(struct vm_fault *vmf)
 	update_mmu_cache(vma, vmf->address, vmf->pte);
 unlock:
 	pte_unmap_unlock(vmf->pte, vmf->ptl);
-out:
-
-	end_time = ktime_get(); 
-	delta_time = ktime_sub(end_time, start_time); 
-	if (ret & VM_FAULT_MAJOR) { 
-		atomic_set(&major_pagefault_latency, (int) ktime_to_ns(delta_time)); 
-	} else { 
-		atomic_set(&major_pagefault_latency, (int) ktime_to_ns(delta_time)); 
-	}
 
 	return ret;
 out_nomap:
@@ -2916,7 +2907,7 @@ out_release:
 		unlock_page(swapcache);
 		put_page(swapcache);
 	}
-
+out: 
 	end_time = ktime_get(); 
 	delta_time = ktime_sub(end_time, start_time); 
 	if (ret & VM_FAULT_MAJOR) { 
