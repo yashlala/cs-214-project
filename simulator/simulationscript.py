@@ -12,10 +12,37 @@ from cgroups import Cgroup
 
 
 # memory_limits = [100, 250, 500, 750, 1000]
-memory_fractions = [0.05, 0.1, 0.25, 0.5, 0.75]
+memory_fractions = [1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4]
+total_page_faults = []
+# some number from the harry_xu file
+disk_fault_latency = 1000
+
+# some number of the internet
+rdma_fault_latency  = 2000
+
+# this is in seconds
+time_with_local_memory = -1
+
+rdma_swap_time = []
+disk_swap_time = []
+software_time =[]
+
+
 pid_list = []
 log = open('log.txt', 'a')
 # output = open('output.txt', 'x+')
+
+def populate_page_faults(file_name, count):
+    cmd  = "sed -n -e '$p' "+file_name
+    last = subprocess.check_output(cmd, shell=True, text=True)
+    print(last)
+    fault = int(last.rsplit(',', 1)[1].strip())
+    total_page_faults.append(fault)
+    if count==1:
+        time_with_local_memory = int(last.split(",")[3].strip())
+        # print(time_with_local_memory)
+
+
 
 def measure_memory(name):
     p = subprocess.Popen(['python3', name],
@@ -24,7 +51,7 @@ def measure_memory(name):
                  preexec_fn=os.setpgrp )
     PID = p.pid
     memory_use = psutil.Process(PID).memory_info().rss / 1024 ** 2
-    print(memory_use)
+    # print(memory_use)
     memory_limits = []
     for frac in memory_fractions:
         memory_limits.append(memory_use * frac)
@@ -95,10 +122,26 @@ def generate_graph(file_name, process):
 def main():
     process = sys.argv[1]
     file_name = 'output.csv'
+
     if os.path.exists(file_name): os.remove(file_name)
     memory_limits = measure_memory(process)
+    
+    count = 1
     for memory in memory_limits:
         run_process(process, memory)
+        populate_page_faults(file_name, count)
+        count = count +1
+    
+
+    
+    for page_fault in total_page_faults:
+        rdma_swap_time.append(page_fault*rdma_fault_latency)
+        disk_swap_time.append(page_fault*disk_fault_latency)
+
+    for time in disk_swap_time:
+        software_time.append(time_with_local_memory - time)
+
+
 
     generate_graph(file_name, process)
 
