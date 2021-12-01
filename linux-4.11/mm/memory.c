@@ -2666,7 +2666,7 @@ void unmap_mapping_range(struct address_space *mapping,
 }
 EXPORT_SYMBOL(unmap_mapping_range);
 
-
+static atomic_t num_major_pagefaults = ATOMIC_INIT(0);
 static atomic64_t major_pagefault_latency = ATOMIC64_INIT(0); 
 static atomic_t minor_pagefault_latency = ATOMIC_INIT(0); 
 /*
@@ -2910,8 +2910,9 @@ out_release:
 out_time: 
 	end_time = ktime_get(); 
 	delta_time = ktime_sub(end_time, start_time); 
-	if (ret & VM_FAULT_MAJOR) { 
-		atomic64_set(&major_pagefault_latency, (int) ktime_to_ns(delta_time)); 
+	if (ret & VM_FAULT_MAJOR) {
+		atomic_inc_and_test(&num_major_pagefaults); 
+		atomic64_add_return((int) ktime_to_ns(delta_time), &major_pagefault_latency); 
 	} else { 
 		atomic_set(&minor_pagefault_latency, (int) ktime_to_ns(delta_time)); 
 	}
@@ -4515,9 +4516,14 @@ static ssize_t pagefault_latency_read(struct file *file, char __user *buf,
 {
 	if (*ppos == 0)
 		page_fault_count++;
+	long average_latency = 0;
+	int current_num_pagefaults = atomic_read(&num_major_pagefaults);
+	if (current_num_pagefaults)
+		average_latency = div64_long(
+			atomic64_read(&major_pagefault_latency),
+			atomic_read(&num_major_pagefaults));
 	snprintf(fastswap_output, sizeof(fastswap_output), 
-			"%llu,%llu\n", page_fault_count,
-			atomic64_read(&major_pagefault_latency));
+			"%llu,%llu\n", page_fault_count, average_latency);
 	return simple_read_from_buffer(buf, len, ppos,
 			fastswap_output, strlen(fastswap_output));
 }
