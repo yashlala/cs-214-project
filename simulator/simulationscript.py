@@ -10,6 +10,17 @@ import matplotlib.pyplot as plt
 
 from cgroups import Cgroup
 
+# Degradation Profile = Perform regression on slowdown factors for 10%, 20%, so on. 
+# Slowdown Factor = (Time with n% mem on RDMA) / (Time with local mem)
+# Time with n% mem on RDMA = Software Time + RDMA Swap Time
+# Software Time = Time with Local Mem - Disk Swap Time
+# Disk Swap Time = # Page Faults * Disk Fault Latency
+# RDMA Swap Time = # Page Faults * RDMA Fault Latency
+
+# Time With Local Mem = We can run the program and time this directly. 
+# Disk Fault Latency = The kernel team will output this via debugfs.
+# RDMA Fault Latency = Google "RDMA latency". 
+# Page Faults = Userspace team will measure this.
 
 # memory_limits = [100, 250, 500, 750, 1000]
 memory_fractions = [1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4]
@@ -21,7 +32,7 @@ disk_fault_latency = 1000
 rdma_fault_latency  = 2000
 
 # this is in seconds
-time_with_local_memory = -1
+time_with_local_memory = []
 
 rdma_swap_time = []
 disk_swap_time = []
@@ -38,8 +49,10 @@ def populate_page_faults(file_name, count):
     print(last)
     fault = int(last.rsplit(',', 1)[1].strip())
     total_page_faults.append(fault)
-    if count==1:
-        time_with_local_memory = int(last.split(",")[3].strip())
+    time_with_local_memory.append((last.split(",")[3].strip()))
+
+    # if count==1:
+        
         # print(time_with_local_memory)
 
 
