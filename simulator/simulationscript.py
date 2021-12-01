@@ -49,7 +49,7 @@ def populate_page_faults(file_name, count):
     print(last)
     fault = int(last.rsplit(',', 1)[1].strip())
     total_page_faults.append(fault)
-    time_with_local_memory.append((last.split(",")[3].strip()))
+    time_with_local_memory.append(int(last.split(",")[3].strip()))
 
     # if count==1:
         
@@ -151,8 +151,8 @@ def main():
         rdma_swap_time.append(page_fault*rdma_fault_latency)
         disk_swap_time.append(page_fault*disk_fault_latency)
 
-    for time in disk_swap_time:
-        software_time.append(time_with_local_memory - time)
+    for i in range (len(disk_swap_time)):
+        software_time.append(time_with_local_memory[i] - disk_swap_time[i])
 
 
 
