@@ -11,10 +11,25 @@ import matplotlib.pyplot as plt
 from cgroups import Cgroup
 
 
-memory_limits = [100, 250, 500, 750, 1000]
+# memory_limits = [100, 250, 500, 750, 1000]
+memory_fractions = [0.05, 0.1, 0.25, 0.5, 0.75]
 pid_list = []
 log = open('log.txt', 'a')
 # output = open('output.txt', 'x+')
+
+def measure_memory(name):
+    p = subprocess.Popen(['python3', name],
+                 stdout=log,
+                 stderr=log,
+                 preexec_fn=os.setpgrp )
+    PID = p.pid
+    memory_use = psutil.Process(PID).memory_info().rss / 1024 ** 2
+    print(memory_use)
+    memory_limits = []
+    for frac in memory_fractions:
+        memory_limits.append(memory_use * frac)
+    return memory_limits
+
 
 def run_process(name, limit):
         cg = Cgroup('testing'+str(limit))
@@ -76,10 +91,12 @@ def generate_graph(file_name, process):
     plt.show()
 
 
+
 def main():
     process = sys.argv[1]
     file_name = 'output.csv'
     if os.path.exists(file_name): os.remove(file_name)
+    memory_limits = measure_memory(process)
     for memory in memory_limits:
         run_process(process, memory)
 
