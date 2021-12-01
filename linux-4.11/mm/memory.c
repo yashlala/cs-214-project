@@ -2725,8 +2725,10 @@ int do_swap_page(struct vm_fault *vmf)
 		// numbers are in there. 
 
 		start_time = ktime_get(); 
+		barrier(); 
 		page = swapin_readahead(entry, GFP_HIGHUSER_MOVABLE, vma,
 					vmf->address);
+		barrier(); 
 		end_time = ktime_get(); 
 
 
